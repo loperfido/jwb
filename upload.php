@@ -19,6 +19,17 @@ require_once "config.php";
 $error = '';
 $success = '';
 
+// Recupera tutti i ruoli
+$sql_ruoli = "SELECT * FROM ruoli ORDER BY nome";
+$ruoli = [];
+$result_ruoli = $conn->query($sql_ruoli);
+
+if ($result_ruoli->num_rows > 0) {
+    while ($row = $result_ruoli->fetch_assoc()) {
+        $ruoli[] = $row;
+    }
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Validazione input
     if (empty(trim($_POST["titolo"]))) {
@@ -73,7 +84,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             $param_utente_id = $_SESSION["id"];
 
                             if ($stmt->execute()) {
-                                $success = "Documento caricato con successo.";
+                                $documento_id = $stmt->insert_id;
+
+                                // Assegna i ruoli con accesso al documento
+                                if (isset($_POST["ruoli_accesso"]) && is_array($_POST["ruoli_accesso"])) {
+                                    foreach ($_POST["ruoli_accesso"] as $ruolo_id) {
+                                        $sql_role = "INSERT INTO documenti_ruoli (documento_id, ruolo_id) VALUES (?, ?)";
+                                        $stmt_role = $conn->prepare($sql_role);
+                                        $stmt_role->bind_param("ii", $documento_id, $ruolo_id);
+                                        $stmt_role->execute();
+                                        $stmt_role->close();
+                                    }
+                                    $success = "Documento caricato con successo e permessi assegnati.";
+                                } else {
+                                    // Se nessun ruolo è selezionato, il documento sarà visibile a tutti
+                                    $success = "Documento caricato con successo. Il documento sarà visibile a tutti gli utenti.";
+                                }
                             } else {
                                 $error = "Errore durante l'inserimento del documento nel database.";
                             }
@@ -167,10 +193,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <textarea name="descrizione" id="descrizione" class="form-control" rows="3"></textarea>
                             </div>
 
-                            <div class="mb-4">
+                            <div class="mb-3">
                                 <label for="file" class="form-label">File PDF *</label>
                                 <input class="form-control" type="file" id="file" name="file" accept="application/pdf" required>
                                 <div class="form-text">Carica solo file PDF. Dimensione massima: 5MB.</div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Accesso per ruoli</label>
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i> Seleziona i ruoli che possono accedere a questo documento. Se non selezioni nessun ruolo, il documento sarà visibile a tutti.
+                                </div>
+                                <div class="border rounded p-3">
+                                    <?php foreach ($ruoli as $ruolo): ?>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="ruoli_accesso[]" value="<?php echo $ruolo['id']; ?>" id="ruolo_<?php echo $ruolo['id']; ?>">
+                                            <label class="form-check-label" for="ruolo_<?php echo $ruolo['id']; ?>">
+                                                <?php echo htmlspecialchars($ruolo['nome']); ?>
+                                            </label>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
 
                             <div class="d-flex justify-content-between">

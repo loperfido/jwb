@@ -10,20 +10,32 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
 
 require_once "config.php";
 
-// Recupero documenti dal database
-$sql = "SELECT d.id, d.titolo, d.descrizione, d.percorso_file, d.tipo_file, d.dimensione, 
+// Recupero documenti dal database considerando i ruoli dell'utente
+$sql = "SELECT DISTINCT d.id, d.titolo, d.descrizione, d.percorso_file, d.tipo_file, d.dimensione, 
                d.data_caricamento, u.nome, u.cognome
         FROM documenti d
         JOIN utenti u ON d.utente_id = u.id
+        LEFT JOIN documenti_ruoli dr ON d.id = dr.documento_id
+        WHERE dr.ruolo_id IS NULL OR dr.ruolo_id IN (
+            SELECT ur.ruolo_id 
+            FROM utenti_ruoli ur 
+            WHERE ur.utente_id = ?
+        )
         ORDER BY d.data_caricamento DESC";
 
 $documenti = [];
-$result = $conn->query($sql);
 
-if ($result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        $documenti[] = $row;
+if ($stmt = $conn->prepare($sql)) {
+    $stmt->bind_param("i", $param_user_id);
+    $param_user_id = $_SESSION["id"];
+
+    if ($stmt->execute()) {
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $documenti[] = $row;
+        }
     }
+    $stmt->close();
 }
 
 // Funzione per formattare la dimensione del file
@@ -35,6 +47,16 @@ function formatBytes($bytes, $precision = 2)
     $pow = min($pow, count($units) - 1);
     $bytes /= (1 << (10 * $pow));
     return round($bytes, $precision) . ' ' . $units[$pow];
+}
+
+// Gestione messaggi di sessione
+$message = '';
+$message_type = '';
+if (isset($_SESSION['message'])) {
+    $message = $_SESSION['message'];
+    $message_type = $_SESSION['message_type'];
+    unset($_SESSION['message']);
+    unset($_SESSION['message_type']);
 }
 ?>
 
@@ -82,6 +104,13 @@ function formatBytes($bytes, $precision = 2)
 
     <!-- Contenuto principale -->
     <div class="container my-4">
+        <?php if (!empty($message)): ?>
+            <div class="alert alert-<?php echo $message_type; ?> alert-dismissible fade show">
+                <?php echo $message; ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Chiudi"></button>
+            </div>
+        <?php endif; ?>
+
         <div class="card shadow">
             <div class="card-header bg-white">
                 <h3 class="card-title">Documenti Disponibili</h3>
