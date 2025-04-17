@@ -56,3 +56,12 @@ INSERT INTO permessi_ruoli (ruolo_id, permesso) VALUES
 -- Il ruolo 'caricatore' può aggiungere ed eliminare documenti
 (7, 'upload'),
 (7, 'delete');
+
+-- Tabella per gestire i permessi di accesso ai documenti per ruolo
+CREATE TABLE documenti_ruoli (
+    documento_id INT,
+    ruolo_id INT,
+    PRIMARY KEY (documento_id, ruolo_id),
+    FOREIGN KEY (documento_id) REFERENCES documenti(id) ON DELETE CASCADE,
+    FOREIGN KEY (ruolo_id) REFERENCES ruoli(id)
+);
