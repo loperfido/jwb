@@ -21,6 +21,9 @@ $sql = "SELECT DISTINCT d.id, d.titolo, d.descrizione, d.percorso_file, d.tipo_f
             FROM utenti_ruoli ur 
             WHERE ur.utente_id = ?
         )
+        OR NOT EXISTS (
+            SELECT 1 FROM documenti_ruoli dr2 WHERE dr2.documento_id = d.id
+        )
         ORDER BY d.data_caricamento DESC";
 
 $documenti = [];

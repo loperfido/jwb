@@ -29,6 +29,9 @@ $sql = "SELECT d.*
                 FROM utenti_ruoli ur 
                 WHERE ur.utente_id = ?
             )
+            OR NOT EXISTS (
+                SELECT 1 FROM documenti_ruoli dr2 WHERE dr2.documento_id = d.id
+            )
         )";
 
 if ($stmt = $conn->prepare($sql)) {
