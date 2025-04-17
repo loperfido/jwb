@@ -18,15 +18,24 @@ if (!isset($_GET["id"]) || empty($_GET["id"])) {
 
 $doc_id = intval($_GET["id"]);
 
-// Recupera informazioni sul documento
+// Recupera informazioni sul documento e verifica se l'utente ha accesso
 $sql = "SELECT d.*, u.nome, u.cognome 
         FROM documenti d
         JOIN utenti u ON d.utente_id = u.id
-        WHERE d.id = ?";
+        LEFT JOIN documenti_ruoli dr ON d.id = dr.documento_id
+        WHERE d.id = ? AND (
+            dr.ruolo_id IS NULL OR 
+            dr.ruolo_id IN (
+                SELECT ur.ruolo_id 
+                FROM utenti_ruoli ur 
+                WHERE ur.utente_id = ?
+            )
+        )";
 
 if ($stmt = $conn->prepare($sql)) {
-    $stmt->bind_param("i", $param_id);
+    $stmt->bind_param("ii", $param_id, $param_user_id);
     $param_id = $doc_id;
+    $param_user_id = $_SESSION["id"];
 
     if ($stmt->execute()) {
         $result = $stmt->get_result();
@@ -34,7 +43,9 @@ if ($stmt = $conn->prepare($sql)) {
         if ($result->num_rows == 1) {
             $documento = $result->fetch_assoc();
         } else {
-            // Documento non trovato
+            // Documento non trovato o utente non autorizzato
+            $_SESSION['message'] = "Non hai l'autorizzazione per visualizzare questo documento.";
+            $_SESSION['message_type'] = "danger";
             header("location: index.php");
             exit;
         }
@@ -59,6 +70,27 @@ function formatBytes($bytes, $precision = 2)
     $bytes /= (1 << (10 * $pow));
     return round($bytes, $precision) . ' ' . $units[$pow];
 }
+
+// Recupera i ruoli associati al documento
+$ruoli_documento = array();
+$sql_ruoli = "SELECT r.nome 
+              FROM documenti_ruoli dr 
+              JOIN ruoli r ON dr.ruolo_id = r.id 
+              WHERE dr.documento_id = ?";
+
+if ($stmt_ruoli = $conn->prepare($sql_ruoli)) {
+    $stmt_ruoli->bind_param("i", $doc_id);
+
+    if ($stmt_ruoli->execute()) {
+        $result_ruoli = $stmt_ruoli->get_result();
+
+        while ($row = $result_ruoli->fetch_assoc()) {
+            $ruoli_documento[] = $row['nome'];
+        }
+    }
+
+    $stmt_ruoli->close();
+}
 ?>
 
 <!DOCTYPE html>
@@ -77,6 +109,13 @@ function formatBytes($bytes, $precision = 2)
             width: 100%;
             border: 1px solid #dee2e6;
             border-radius: 4px;
+        }
+
+        .role-badge {
+            font-size: 0.8rem;
+            margin-right: 0.25rem;
+            margin-bottom: 0.25rem;
+            display: inline-block;
         }
     </style>
 </head>
@@ -136,6 +175,17 @@ function formatBytes($bytes, $precision = 2)
 
                             <dt class="col-sm-4">Dimensione:</dt>
                             <dd class="col-sm-8"><?php echo formatBytes($documento['dimensione']); ?></dd>
+
+                            <dt class="col-sm-4">Accesso limitato a:</dt>
+                            <dd class="col-sm-8">
+                                <?php if (empty($ruoli_documento)): ?>
+                                    <span class="text-muted">Tutti gli utenti</span>
+                                <?php else: ?>
+                                    <?php foreach ($ruoli_documento as $ruolo): ?>
+                                        <span class="badge bg-info role-badge"><?php echo htmlspecialchars($ruolo); ?></span>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </dd>
                         </dl>
                     </div>
                     <div class="col-md-6">
