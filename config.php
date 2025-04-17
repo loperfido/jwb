@@ -4,7 +4,7 @@
 define('DB_SERVER', 'localhost');
 define('DB_USERNAME', 'root');
 define('DB_PASSWORD', 'cry');
-define('DB_NAME', 'pdf_management');
+define('DB_NAME', 'my_lattuga');
 
 // Percorso per i file caricati
 define('UPLOAD_DIR', 'uploads/');
